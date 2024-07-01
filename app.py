@@ -4,33 +4,32 @@ from iertools.read import read_epw
 import matplotlib.pyplot as plt
 import enerhabitat.definitions as ehd
 import numpy as np
+from shared import sidebar
+from enerhabitat.diatipico import *
+import plotly.express as px
+from shinywidgets import output_widget, render_plotly
+from enerhabitat.calculate import solve_1d_Tfree
+import plotly.graph_objects as go
+
+# timezone = pytz.timezone('America/Mexico_City')
+# timezone = pytz.FixedOffset(-300)
+
 
 
 app_ui = ui.page_sidebar(
     ui.sidebar(
-        ui.input_select(
-            "lugar", "Lugar", choices=eh.lugares
-        ),
-        ui.input_select(
-            "mes", "Mes", choices=ehd.months
-        ),
-        ui.input_numeric(
-            "absortancia", "Absortancia",0.3, min=0,max=1,step=0.01
-        ),
-        ui.input_select(
-            "tipo", "Tipo", choices=["Muro","Techo"]
-        ),
+        sidebar(eh.lugares,ehd.months)
     ),
     ui.navset_tab("",
                   ui.nav_panel(
                       "Temperaturas",
-                      ui.card(ui.output_plot("plot_temperatura"),
+                      ui.card(output_widget("plot_temperatura"),
                               full_screen=True
                               ),
                     ),
                   ui.nav_panel(
                       "Radiación",
-                      ui.card(ui.output_plot("plot_radiacion"),
+                      ui.card(output_widget("plot_radiacion"),
                               full_screen=True
                               ),
                     ),
@@ -44,37 +43,87 @@ app_ui = ui.page_sidebar(
 )
 
 
-
-
-
 def server(input, output, session):
     @reactive.Calc
-    def caracteristics():
+    def load_day():
         caracteristicas = eh.cargar_caracteristicas(input.lugar())
         epw = read_epw(caracteristicas["epw"],alias=True,year=2024,warns=False)
-        return epw
+        absortancia = input.absortancia() #0.3
+        surface_tilt = float(input.inclinacion() ) # ubicacion
+        surface_azimuth = float(input.orientacion()) #270
+        mes = str(input.mes()).zfill(2)
 
-    @render.plot
+        timezone = pytz.FixedOffset(caracteristicas['timezone'])
+        print(timezone)
+        dia = calculate_day(
+            epw,
+            caracteristicas['lat'],
+            caracteristicas['lon'],
+            caracteristicas['alt'],
+            mes,
+            absortancia,
+            surface_tilt,
+            surface_azimuth,
+            timezone
+        )
+        return dia
+
+    @render_plotly
     def plot_temperatura():
-        epw = caracteristics()
-        fig, ax = plt.subplots() 
-        
-        ax.plot(epw.To.loc[f"2024-{input.mes().zfill(2)}"])
-    @render.plot
+        dia = load_day()
+        dia = solve_1d_Tfree(dia)
+        df = dia.reset_index().iloc[::600]
+        fig = px.line(df,x="index",y=["Tsa",'Ta','Ti'])
+        fig.add_trace(go.Scatter(
+                                x=df["index"], 
+                                y=df['Tn'] + df['DeltaTn'], 
+                                mode='lines',
+                                showlegend=False , 
+                                line=dict(color='rgba(0,0,0,0)')
+                                )
+        )
+
+        fig.add_trace(go.Scatter(
+                                x=df["index"], 
+                                y=df['Tn'] -df['DeltaTn'], 
+                                mode='lines',
+                                showlegend=False , 
+                                fill='tonexty',
+                                line=dict(color='rgba(0,0,0,0)'),
+                                fillcolor='rgba(0,255,0,0.3)'
+                                )
+        )
+
+    # Personalizar el layout
+
+        fig.update_layout(
+            yaxis_title='Temperatura (°C)',
+            legend_title='', 
+            xaxis_title=''
+        )
+
+        return fig
+    @render_plotly
     def plot_radiacion():
-        epw = caracteristics()
-        fig, ax = plt.subplots() 
-        
-        ax.plot(epw.Ig.loc[f"2024-{input.mes().zfill(2)}"])
-        ax.plot(epw.Ib.loc[f"2024-{input.mes().zfill(2)}"])
-        ax.plot(epw.Id.loc[f"2024-{input.mes().zfill(2)}"])
+        dia = load_day()
+        df = dia.reset_index().iloc[::600]
+        fig = px.line(df,x="index",y=["Ig","Ib","Id","Is"])
+        fig.update_layout(
+            yaxis_title='Radiación (W/m2)',
+            legend_title='',  # Quitar el título de la leyenda
+            xaxis_title=''
+        )
+        fig.update_yaxes(range=[0, 1200])  #
+ 
+        return fig
+
     @render.data_frame
     def df_resultados():
-        epw = caracteristics()
-        mes = epw[["To","Ig","Ib","Id"]].loc[f"2024-{input.mes().zfill(2)}"]
-        mes = mes.reset_index()
-        mes['tiempo'] = mes['tiempo'].dt.strftime('%Y-%m-%d %H:%M:%S')  # Convertir a string legible
+        dia = load_day()
+        mes = dia.reset_index()
+        mes['index'] = mes['index'].dt.strftime('%Y-%m-%d %H:%M:%S')  # Convertir a string legible
 
-        return render.DataGrid(mes)
+
+        return render.DataGrid(mes[['index','Tsa','Ta','Ig','Is']].iloc[::600].round(1))
     
 app = App(app_ui, server)

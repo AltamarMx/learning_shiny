@@ -16,6 +16,7 @@ def cargar_caracteristicas(lugar):
     return {
         "lat": lugar_config.getfloat('lat'),
         "lon": lugar_config.getfloat('lon'),
+        "timezone": lugar_config.getfloat('timezone'),
         "alt": lugar_config.getint('altitude'),
         "epw": lugar_config['f_epw']
 }

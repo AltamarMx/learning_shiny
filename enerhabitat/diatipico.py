@@ -8,7 +8,7 @@ from dateutil.parser import parse
 import locale
 from matplotlib.dates import ConciseDateFormatter, AutoDateLocator
 import pytz
-from . import dia
+
 
 def temperature_model(df, Tmin, Tmax, Ho, Hi):
     """
@@ -60,13 +60,12 @@ def calculate_tTmaxTminTmax(month,epw):
     hora = hora_minutos.dt.hour
     minuto = hora_minutos.dt.minute
     tTmax = hora.mean() +  minuto.mean()/60 
-    epw_mes = epw.loc[epw.index.month==int(month)]
-    horas  = epw_mes.resample('D').To.idxmax().resample('ME').mean().dt.hour 
-    minutos = epw_mes.resample('D').To.idxmax().resample('ME').mean().dt.minute
-    tTmax = horas.iloc[0]+ minutos.iloc[0]/60 
+    # epw_mes = epw.loc[epw.index.month==int(month)]
+    # horas  = epw_mes.resample('D').To.idxmax().resample('ME').mean().dt.hour 
+    # minutos = epw_mes.resample('D').To.idxmax().resample('ME').mean().dt.minute
+    # tTmax = horas.iloc[0]+ minutos.iloc[0]/60 
     Tmin =  epw_mes.resample('D').To.min().resample('ME').mean().iloc[0]
     Tmax =  epw_mes.resample('D').To.max().resample('ME').mean().iloc[0]
-    
     return tTmax,Tmin,Tmax
 
 
@@ -129,8 +128,8 @@ def calculate_dt(df):
     return df
 
 
-def calculate_day(f_epw, lat, lon, altitude, month, absortance, surface_tilt, surface_azimuth, timezone):
-    epw = read_epw(f_epw, alias=True, year='2024', warns=False)
+def calculate_day(epw,lat, lon, altitude, month, absortance, surface_tilt, surface_azimuth, timezone):
+    # epw = read_epw(f_epw, alias=True, year='2024', warns=False)
     ho = 13.
     day = '15'
     if surface_tilt == 0:
@@ -152,6 +151,7 @@ def calculate_day(f_epw, lat, lon, altitude, month, absortance, surface_tilt, su
 
     sunrise, _ = get_sunrise_sunset_times(solar_position)
     tTmax, Tmin, Tmax = calculate_tTmaxTminTmax(month, epw)
+    print(tTmax,Tmin,Tmax,sunrise)
     
     # Calcular la temperatura ambiente y agregarla al DataFrame
     solar_position = temperature_model(solar_position, Tmin, Tmax, sunrise, tTmax)
