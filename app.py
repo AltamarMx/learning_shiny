@@ -18,7 +18,9 @@ import plotly.graph_objects as go
 
 app_ui = ui.page_sidebar(
     ui.sidebar(
-        sidebar(eh.lugares,ehd.months)
+        sidebar(eh.lugares,ehd.months),
+        ui.input_switch("correr", "Ejecutar", False)  
+
     ),
     ui.navset_tab("",
                   ui.nav_panel(
@@ -54,7 +56,6 @@ def server(input, output, session):
         mes = str(input.mes()).zfill(2)
 
         timezone = pytz.FixedOffset(caracteristicas['timezone'])
-        print(timezone)
         dia = calculate_day(
             epw,
             caracteristicas['lat'],
@@ -67,13 +68,26 @@ def server(input, output, session):
             timezone
         )
         return dia
+    
+    @reactive.Calc
+    def solve_heat_transfer():
+        # dia = load_day()
+        dia['Ti'] = dia.Tsa + np.random.random()  # Placeholder para tu cálculo real
+        dia['Tse'] = dia.Tsa + np.random.random() + 3.  # Placeholder para tu cálculo real
+        dia['Tsi'] = dia.Tsa + np.random.random() - 3  # Placeholder para tu cálculo real
+        # return dia
 
     @render_plotly
     def plot_temperatura():
         dia = load_day()
-        dia = solve_1d_Tfree(dia)
+        # dia = solve_heat_transfer()
         df = dia.reset_index().iloc[::600]
-        fig = px.line(df,x="index",y=["Tsa",'Ta','Ti'])
+        columnas =  ["Tsa",'Ta','Ti']
+        # if input.ejecutar():
+        #     columnas = ["Tsa",'Ta','Ti',"Tse","Tsi"]
+        # else:
+        #     columnas = ["Tsa",'Ta','Ti']
+        fig = px.line(df,x="index",y=columnas)
         fig.add_trace(go.Scatter(
                                 x=df["index"], 
                                 y=df['Tn'] + df['DeltaTn'], 

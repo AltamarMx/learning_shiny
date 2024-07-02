@@ -82,6 +82,9 @@ def add_IgIbId_Tn(dia,epw,mes,f1,f2,timezone):
     dia['Id'] = Irr.Id
     dia.ffill(inplace=True)
     dia['Tn'] = 13.5 + 0.54*dia.Ta.mean()
+    dia["Ti"] = np.nan
+    dia["Tse"] = np.nan
+    dia["Tsi"] = np.nan
     
     return dia
     
